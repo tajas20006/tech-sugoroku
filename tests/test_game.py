@@ -45,6 +45,16 @@ def test_payment_deducts_required_credits_when_affordable() -> None:
     assert game.players[0].credits == 200
 
 
+def test_payment_passage_is_reported_even_when_landing_on_another_space() -> None:
+    game = make_game()
+    game.players[0].position = 14
+
+    result = game.take_turn(2)
+
+    assert game.players[0].position == 16
+    assert result.payment_message == "支払日を通過！ -100 Credits"
+
+
 def test_payment_returns_to_previous_checkpoint_when_unaffordable() -> None:
     game = make_game()
     game.players[0].position = 14

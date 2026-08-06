@@ -18,3 +18,4 @@ def test_main_uses_current_flet_apis() -> None:
     assert "asyncio.sleep" in source
     assert "show_cutin" in source
     assert "cutin_overlay" in source
+    assert "result.payment_message" in source

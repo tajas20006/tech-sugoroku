@@ -51,6 +51,7 @@ class TurnResult:
     space_type: SpaceType
     message: str
     question: Question | None = None
+    payment_message: str | None = None
 
 
 SPACE_MAP: dict[int, SpaceType] = {
@@ -142,24 +143,24 @@ class Game:
         actual_roll = min(6, roll + self._consume_item(player, Item.AUTO_SCALING, bonus=2))
         start = player.position
         player.position = min(59, player.position + actual_roll)
-        payment_message = self._process_payments(player, start)
-        if payment_message:
+        payment_failure, payment_message = self._process_payments(player, start)
+        if payment_failure:
             self._end_turn()
-            return TurnResult(player_index, actual_roll, SpaceType.PAYMENT, payment_message)
+            return TurnResult(player_index, actual_roll, SpaceType.PAYMENT, payment_failure, payment_message=payment_failure)
 
         space_type = self.space_at(player.position)
         if space_type in (SpaceType.QUIZ, SpaceType.EXAM):
             question = self._next_question(is_exam=space_type is SpaceType.EXAM)
             self.pending_question = question
             self.pending_player_index = player_index
-            return TurnResult(player_index, actual_roll, space_type, "クイズに挑戦！", question)
+            return TurnResult(player_index, actual_roll, space_type, "クイズに挑戦！", question, payment_message)
 
-        message = self._resolve_space(player, space_type)
+        message = payment_message if space_type is SpaceType.PAYMENT and payment_message else self._resolve_space(player, space_type)
         if player.position == 59 and player.final_payment_paid:
             self.winner_index = player_index
             message = f"{player.name} がゴール！ 勝利です！"
         self._end_turn()
-        return TurnResult(player_index, actual_roll, space_type, message)
+        return TurnResult(player_index, actual_roll, space_type, message, payment_message=payment_message)
 
     def answer_question(self, answer_index: int) -> bool:
         if self.pending_question is None or self.pending_player_index is None:
@@ -188,18 +189,21 @@ class Game:
         self._lose_credits(player, 100)
         return False
 
-    def _process_payments(self, player: Player, start: int) -> str | None:
+    def _process_payments(self, player: Player, start: int) -> tuple[str | None, str | None]:
+        payment_message: str | None = None
         for position, cost in PAYMENTS.items():
             if start < position <= player.position:
                 discount = player.badges * 50
                 amount = max(0, cost - discount)
                 if player.credits < amount:
                     player.position = max((checkpoint for checkpoint in PAYMENTS if checkpoint < position), default=0)
-                    return f"クレジット不足！ 前の支払日へ戻る。必要額: {amount}"
+                    message = f"クレジット不足！ 前の支払日へ戻る。必要額: {amount}"
+                    return message, message
                 player.credits -= amount
+                payment_message = f"支払日を通過！ -{amount} Credits"
                 if position == 55:
                     player.final_payment_paid = True
-        return None
+        return None, payment_message
 
     def _resolve_space(self, player: Player, space_type: SpaceType) -> str:
         if space_type is SpaceType.GAIN:

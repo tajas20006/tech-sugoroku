@@ -256,6 +256,8 @@ def main(page: ft.Page) -> None:
         sync_tokens()
         status.value = f"{game.players[result.player_index].name}: {result.roll} を出した。{result.message}"
         redraw_players()
+        if result.payment_message and result.space_type is not SpaceType.PAYMENT:
+            await show_cutin(result.payment_message, SpaceType.PAYMENT)
         await show_cutin(result.message, result.space_type)
         await show_event(result.message, result.space_type)
         if result.question:
