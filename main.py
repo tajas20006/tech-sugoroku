@@ -56,6 +56,29 @@ def main(page: ft.Page) -> None:
         opacity=0,
         animate_opacity=ft.Animation(180, ft.AnimationCurve.EASE_OUT),
     )
+    cutin_icon = ft.Text("", size=68, text_align=ft.TextAlign.CENTER)
+    cutin_title = ft.Text("", size=28, weight=ft.FontWeight.BOLD, color="#FFFFFF", text_align=ft.TextAlign.CENTER)
+    cutin_message = ft.Text("", size=15, color="#FFFFFF", text_align=ft.TextAlign.CENTER)
+    cutin_overlay = ft.Container(
+        content=ft.Column(
+            [cutin_icon, cutin_title, cutin_message],
+            alignment=ft.MainAxisAlignment.CENTER,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=4,
+        ),
+        left=0,
+        top=0,
+        width=BOARD_WIDTH,
+        height=BOARD_HEIGHT,
+        alignment=ft.Alignment.CENTER,
+        bgcolor="#4C1D95E8",
+        border_radius=16,
+        opacity=0,
+        scale=ft.Scale(0.88),
+        animate_opacity=ft.Animation(160, ft.AnimationCurve.EASE_OUT),
+        animate_scale=ft.Animation(180, ft.AnimationCurve.EASE_OUT),
+        ignore_interactions=True,
+    )
     token_controls = [
         ft.Container(
             content=ft.Image(src=f"images/tokens/player-{color}.png", width=42, height=42),
@@ -109,6 +132,7 @@ def main(page: ft.Page) -> None:
             )
         board.controls.extend(token_controls)
         board.controls.append(event_banner)
+        board.controls.append(cutin_overlay)
 
     def sync_tokens() -> None:
         for index, player in enumerate(game.players):
@@ -140,6 +164,28 @@ def main(page: ft.Page) -> None:
         page.update()
         await asyncio.sleep(0.8)
         event_banner.opacity = 0
+        page.update()
+
+    async def show_cutin(message: str, space_type: SpaceType) -> None:
+        cutin_styles = {
+            SpaceType.PAYMENT: ("🧾", "支払日", "#9A3412E8"),
+            SpaceType.EXAM: ("🏆", "資格試験", "#854D0EE8"),
+            SpaceType.SUMMIT: ("☁️", "AWS Summit", "#0E7490E8"),
+            SpaceType.ITEM: ("🎁", "アイテム獲得", "#1D4ED8E8"),
+            SpaceType.QUIZ: ("❓", "AWS クイズ", "#6D28D9E8"),
+            SpaceType.LOSS: ("⚠️", "コスト発生", "#B91C1CE8"),
+        }
+        style = cutin_styles.get(space_type)
+        if style is None:
+            return
+        cutin_icon.value, cutin_title.value, cutin_overlay.bgcolor = style
+        cutin_message.value = message
+        cutin_overlay.opacity = 0.96
+        cutin_overlay.scale = ft.Scale(1.0)
+        page.update()
+        await asyncio.sleep(0.85)
+        cutin_overlay.opacity = 0
+        cutin_overlay.scale = ft.Scale(1.08)
         page.update()
 
     def redraw_players() -> None:
@@ -210,6 +256,7 @@ def main(page: ft.Page) -> None:
         sync_tokens()
         status.value = f"{game.players[result.player_index].name}: {result.roll} を出した。{result.message}"
         redraw_players()
+        await show_cutin(result.message, result.space_type)
         await show_event(result.message, result.space_type)
         if result.question:
             show_question(result.question)

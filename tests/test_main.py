@@ -16,3 +16,5 @@ def test_main_uses_current_flet_apis() -> None:
     assert "ft.Stack(" in source
     assert "animate_position" in source
     assert "asyncio.sleep" in source
+    assert "show_cutin" in source
+    assert "cutin_overlay" in source
