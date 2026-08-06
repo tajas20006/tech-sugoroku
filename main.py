@@ -20,6 +20,9 @@ SPACE_STYLES = {
     SpaceType.EXAM: ("#FDE68A", "🏆"),
     SpaceType.GOAL: ("#FDE68A", "GOAL"),
 }
+BOARD_WIDTH = 800
+BOARD_HEIGHT = 480
+CELL_SIZE = 80
 
 
 def main(page: ft.Page) -> None:
@@ -29,21 +32,57 @@ def main(page: ft.Page) -> None:
 
     game = Game(QUESTIONS)
     status = ft.Text("青プレイヤーのターンです。サイコロを振ろう！", size=18, weight=ft.FontWeight.BOLD)
-    board = ft.GridView(runs_count=10, max_extent=72, spacing=5, run_spacing=5, expand=True)
+    board = ft.Stack(width=BOARD_WIDTH, height=BOARD_HEIGHT)
     player_cards = ft.Column(spacing=8)
     question_area = ft.Column(spacing=10)
     roll_button = ft.Button("🎲 サイコロを振る", width=220)
     die_display = ft.Text("🎲", size=44, text_align=ft.TextAlign.CENTER)
+    die_box = ft.Container(
+        content=die_display,
+        alignment=ft.Alignment.CENTER,
+        animate_scale=ft.Animation(90, ft.AnimationCurve.EASE_OUT),
+        scale=ft.Scale(1.0),
+    )
+    event_text = ft.Text("", size=18, weight=ft.FontWeight.BOLD, color="#FFFFFF")
+    event_banner = ft.Container(
+        content=event_text,
+        left=180,
+        top=12,
+        width=440,
+        padding=12,
+        alignment=ft.Alignment.CENTER,
+        bgcolor="#2563EB",
+        border_radius=16,
+        opacity=0,
+        animate_opacity=ft.Animation(180, ft.AnimationCurve.EASE_OUT),
+    )
+    token_controls = [
+        ft.Container(
+            content=ft.Image(src=f"images/tokens/player-{color}.png", width=42, height=42),
+            width=42,
+            height=42,
+            animate_position=ft.Animation(120, ft.AnimationCurve.EASE_OUT),
+            animate_scale=ft.Animation(100, ft.AnimationCurve.EASE_OUT),
+            scale=ft.Scale(1.0),
+        )
+        for color in ("blue", "pink")
+    ]
 
-    def token_for(position: int) -> str:
-        tokens: list[str] = []
-        for index, player in enumerate(game.players):
-            if player.position == position:
-                tokens.append("🔵" if index == 0 else "🩷")
-        return "".join(tokens)
+    def token_coordinates(player_index: int, position: int) -> tuple[int, int]:
+        column = position % 10
+        row = position // 10
+        return column * CELL_SIZE + 16 + player_index * 22, row * CELL_SIZE + 31
 
-    def redraw_board() -> None:
+    def create_board() -> None:
         board.controls.clear()
+        board.controls.append(
+            ft.Container(
+                width=BOARD_WIDTH,
+                height=BOARD_HEIGHT,
+                border_radius=16,
+                image=ft.DecorationImage(src="images/board-background.png", fit=ft.BoxFit.COVER, opacity=0.48),
+            )
+        )
         for position in range(60):
             space_type = game.space_at(position)
             color, marker = SPACE_STYLES[space_type]
@@ -54,7 +93,6 @@ def main(page: ft.Page) -> None:
                         [
                             ft.Text(str(position), size=10, color="#334155"),
                             ft.Text(label, size=13, weight=ft.FontWeight.BOLD),
-                            ft.Text(token_for(position), size=14),
                         ],
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                         spacing=0,
@@ -63,8 +101,46 @@ def main(page: ft.Page) -> None:
                     border_radius=10,
                     padding=4,
                     alignment=ft.Alignment.CENTER,
+                    left=(position % 10) * CELL_SIZE + 3,
+                    top=(position // 10) * CELL_SIZE + 3,
+                    width=CELL_SIZE - 6,
+                    height=CELL_SIZE - 6,
                 )
             )
+        board.controls.extend(token_controls)
+        board.controls.append(event_banner)
+
+    def sync_tokens() -> None:
+        for index, player in enumerate(game.players):
+            token_controls[index].left, token_controls[index].top = token_coordinates(index, player.position)
+
+    async def animate_token(player_index: int, start: int, destination: int) -> None:
+        for position in range(start + 1, destination + 1):
+            token = token_controls[player_index]
+            token.left, token.top = token_coordinates(player_index, position)
+            token.scale = ft.Scale(1.18)
+            page.update()
+            await asyncio.sleep(0.11)
+            token.scale = ft.Scale(1.0)
+            page.update()
+            await asyncio.sleep(0.04)
+
+    async def show_event(message: str, space_type: SpaceType) -> None:
+        event_text.value = message
+        event_banner.bgcolor = {
+            SpaceType.GAIN: "#16A34A",
+            SpaceType.LOSS: "#DC2626",
+            SpaceType.PAYMENT: "#EA580C",
+            SpaceType.QUIZ: "#7C3AED",
+            SpaceType.EXAM: "#A16207",
+            SpaceType.ITEM: "#2563EB",
+            SpaceType.SUMMIT: "#0891B2",
+        }.get(space_type, "#475569")
+        event_banner.opacity = 1
+        page.update()
+        await asyncio.sleep(0.8)
+        event_banner.opacity = 0
+        page.update()
 
     def redraw_players() -> None:
         player_cards.controls.clear()
@@ -108,7 +184,7 @@ def main(page: ft.Page) -> None:
         outcome = "正解！" if correct else "不正解。"
         status.value = f"{outcome} {question.explanation if question else ''}"
         clear_question()
-        redraw_board()
+        sync_tokens()
         redraw_players()
         page.update()
 
@@ -116,15 +192,25 @@ def main(page: ft.Page) -> None:
         roll_button.disabled = True
         for _ in range(10):
             die_display.value = f"🎲 {random.randint(1, 6)}"
+            die_box.scale = ft.Scale(1.12)
             status.value = "サイコロが回転中……"
             page.update()
             await asyncio.sleep(0.08)
+            die_box.scale = ft.Scale(1.0)
         roll = random.randint(1, 6)
         die_display.value = f"🎲 {roll}"
+        die_box.scale = ft.Scale(1.35)
+        page.update()
+        await asyncio.sleep(0.18)
+        die_box.scale = ft.Scale(1.0)
+        start_position = game.current_player.position
         result = game.take_turn(roll)
+        landing_position = min(59, start_position + result.roll)
+        await animate_token(result.player_index, start_position, landing_position)
+        sync_tokens()
         status.value = f"{game.players[result.player_index].name}: {result.roll} を出した。{result.message}"
-        redraw_board()
         redraw_players()
+        await show_event(result.message, result.space_type)
         if result.question:
             show_question(result.question)
         else:
@@ -132,19 +218,14 @@ def main(page: ft.Page) -> None:
         page.update()
 
     roll_button.on_click = roll_dice
-    redraw_board()
+    create_board()
+    sync_tokens()
     redraw_players()
 
     left_panel = ft.Container(content=player_cards, width=260, padding=12, bgcolor="#DBEAFE", border_radius=16)
-    board_panel = ft.Container(
-        content=board,
-        expand=True,
-        padding=12,
-        border_radius=16,
-        image=ft.DecorationImage(src="images/board-background.png", fit=ft.BoxFit.COVER, opacity=0.35),
-    )
+    board_panel = ft.Container(content=board, padding=12, border_radius=16, bgcolor="#FFFFFF99")
     right_panel = ft.Container(
-        content=ft.Column([die_display, roll_button, ft.Divider(), status, ft.Divider(), question_area], scroll=ft.ScrollMode.AUTO),
+        content=ft.Column([die_box, roll_button, ft.Divider(), status, ft.Divider(), question_area], scroll=ft.ScrollMode.AUTO),
         width=350,
         padding=12,
         bgcolor="#F8FAFC",

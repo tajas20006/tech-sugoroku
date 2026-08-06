@@ -13,3 +13,6 @@ def test_main_uses_current_flet_apis() -> None:
     assert "ft.Button(" in source
     assert "ft.Alignment.CENTER" in source
     assert "ft.BoxFit.COVER" in source
+    assert "ft.Stack(" in source
+    assert "animate_position" in source
+    assert "asyncio.sleep" in source
