@@ -24,6 +24,16 @@ class Item(str, Enum):
     AWS_BACKUP = "AWS Backup"
     COST_EXPLORER = "Cost Explorer"
     CLOUDFRONT = "CloudFront"
+    RESERVED_INSTANCE = "リザーブドインスタンス"
+    WELL_ARCHITECTED = "Well-Architected Review"
+    SUPPORT_PLAN = "AWS サポートプラン"
+    TRANSIT_GATEWAY = "Transit Gateway"
+    LAMBDA = "Lambda"
+    DDOS_ATTACK = "DDoS 攻撃"
+    NAT_GATEWAY = "不要な NAT Gateway"
+    CLOUDWATCH_LOGS = "無限 CloudWatch Logs"
+    REGION_RUMOR = "リージョン障害のうわさ"
+    MULTI_AZ = "Multi-AZ"
 
 
 @dataclass(frozen=True)
@@ -45,6 +55,14 @@ class Player:
     badges: int = 0
     final_payment_paid: bool = False
     roll_bonus: int = 0
+    payment_discount: int = 0
+    loss_halved: bool = False
+    quiz_hint_ready: bool = False
+    quiz_penalty_protected: bool = False
+    extra_turns: int = 0
+    skip_turns: int = 0
+    gain_halved: bool = False
+    used_item_this_turn: bool = False
 
 
 @dataclass
@@ -221,7 +239,10 @@ class Game:
             if question.is_exam:
                 player.badges += 1
         else:
-            self._lose_credits(player, 80 if question.is_exam else 20)
+            if player.quiz_penalty_protected:
+                player.quiz_penalty_protected = False
+            else:
+                self._lose_credits(player, 80 if question.is_exam else 20)
         self.pending_question = None
         self.pending_player_index = None
         self._end_turn()
@@ -238,39 +259,92 @@ class Game:
     def _random_message(self, category: str) -> str:
         return self.rng.choice(self.message_pools[category])
 
+    def consume_quiz_hint(self, player_index: int) -> int | None:
+        player = self.players[player_index]
+        question = self.pending_question
+        if not player.quiz_hint_ready or question is None:
+            return None
+        player.quiz_hint_ready = False
+        return next(index for index in range(4) if index != question.answer_index)
+
     def use_item(self, player_index: int, item: Item) -> str:
         if player_index != self.current_player_index:
             raise ValueError("Only the current player can use an item.")
         if self.pending_question is not None:
             raise ValueError("Answer the current question first.")
         player = self.players[player_index]
+        if player.used_item_this_turn:
+            raise ValueError("Only one active item can be used per turn.")
         if item not in player.items:
             raise ValueError("The player does not own this item.")
+        player.used_item_this_turn = True
         if item is Item.AUTO_SCALING:
             player.items.remove(item)
             player.roll_bonus += 2
             return "Auto Scaling を使用！ 次のサイコロに +2。"
         if item is Item.CLOUDFRONT:
             player.items.remove(item)
-            player.roll_bonus += 1
-            return "CloudFront を使用！ 次のサイコロに +1。"
+            player.roll_bonus += 2
+            return "CloudFront を使用！ 次のサイコロに +2。"
         if item is Item.COST_EXPLORER:
             player.items.remove(item)
-            player.credits += 60
-            return "Cost Explorer で無駄を発見！ +60 Credits"
+            player.payment_discount += 50
+            return "Cost Explorer を使用！ 次の支払日を 50 Credits 軽減。"
+        if item is Item.RESERVED_INSTANCE:
+            player.items.remove(item)
+            player.loss_halved = True
+            return "リザーブドインスタンスを適用！ 次のコスト発生を半減。"
+        if item is Item.WELL_ARCHITECTED:
+            player.items.remove(item)
+            player.quiz_hint_ready = True
+            return "Well-Architected Review を実施！ 次のクイズで選択肢を1つ除外。"
+        if item is Item.SUPPORT_PLAN:
+            player.items.remove(item)
+            player.quiz_penalty_protected = True
+            return "AWS サポートプランを利用！ 次のクイズ失敗ペナルティを無効化。"
+        if item is Item.TRANSIT_GATEWAY:
+            player.items.remove(item)
+            player.roll_bonus += 3
+            return "Transit Gateway を使用！ ショートカットで次のサイコロに +3。"
+        if item is Item.LAMBDA:
+            player.items.remove(item)
+            player.extra_turns += 1
+            return "Lambda を使用！ 次のターンをもう1回行える。"
+        target = self.players[self._other_player_index(player_index)]
+        if item is Item.DDOS_ATTACK:
+            player.items.remove(item)
+            blocked = self.apply_ddos(self._other_player_index(player_index))
+            return "相手の WAF に防がれた！" if blocked else "相手へ DDoS 攻撃！ -100 Credits"
+        if item is Item.NAT_GATEWAY:
+            player.items.remove(item)
+            self._lose_credits(target, 60)
+            return "相手に不要な NAT Gateway が増えた！ -60 Credits"
+        if item is Item.CLOUDWATCH_LOGS:
+            player.items.remove(item)
+            target.gain_halved = True
+            return "相手の CloudWatch Logs が増殖！ 次の獲得クレジットを半減。"
+        if item is Item.REGION_RUMOR:
+            player.items.remove(item)
+            if Item.MULTI_AZ in target.items:
+                target.items.remove(Item.MULTI_AZ)
+                return "相手の Multi-AZ が障害を回避！"
+            target.skip_turns += 1
+            return "リージョン障害のうわさが広がった！ 相手は1ターン休み。"
+        player.used_item_this_turn = False
         return f"{item.value} は自動防御アイテムです。"
 
     def _process_payments(self, player: Player, start: int) -> tuple[str | None, str | None]:
         payment_message: str | None = None
         for position, cost in PAYMENTS.items():
             if start < position <= player.position:
-                discount = player.badges * 50
+                discount = player.badges * 50 + player.payment_discount
                 amount = max(0, cost - discount)
                 if player.credits < amount:
                     player.position = max((checkpoint for checkpoint in PAYMENTS if checkpoint < position), default=0)
                     message = f"クレジット不足！ 前の支払日へ戻る。必要額: {amount}"
                     return message, message
                 player.credits -= amount
+                player.payment_discount = 0
                 payment_message = self._random_message("payment").format(amount=amount)
                 if position == 55:
                     player.final_payment_paid = True
@@ -278,14 +352,18 @@ class Game:
 
     def _resolve_space(self, player: Player, space_type: SpaceType) -> str:
         if space_type is SpaceType.GAIN:
-            player.credits += 100
-            return self._random_message("gain").format(amount=100)
+            amount = 50 if player.gain_halved else 100
+            player.gain_halved = False
+            player.credits += amount
+            return self._random_message("gain").format(amount=amount)
         if space_type is SpaceType.LOSS:
             if Item.AWS_BACKUP in player.items:
                 player.items.remove(Item.AWS_BACKUP)
                 return "AWS Backup が損失を防いだ！"
-            self._lose_credits(player, 40)
-            return self._random_message("loss").format(amount=40)
+            amount = 20 if player.loss_halved else 40
+            player.loss_halved = False
+            self._lose_credits(player, amount)
+            return self._random_message("loss").format(amount=amount)
         if space_type is SpaceType.ITEM:
             if len(player.items) < 3:
                 item = self.rng.choice(list(Item))
@@ -329,6 +407,20 @@ class Game:
     def _lose_credits(self, player: Player, amount: int) -> None:
         player.credits = max(0, player.credits - amount)
 
+    def _other_player_index(self, player_index: int) -> int:
+        return (player_index + 1) % len(self.players)
+
     def _end_turn(self) -> None:
-        if self.winner_index is None:
-            self.current_player_index = (self.current_player_index + 1) % len(self.players)
+        if self.winner_index is not None:
+            return
+        current = self.current_player
+        if current.extra_turns:
+            current.extra_turns -= 1
+            current.used_item_this_turn = False
+            return
+        next_index = self._other_player_index(self.current_player_index)
+        while self.players[next_index].skip_turns:
+            self.players[next_index].skip_turns -= 1
+            next_index = self._other_player_index(next_index)
+        self.current_player_index = next_index
+        self.current_player.used_item_this_turn = False

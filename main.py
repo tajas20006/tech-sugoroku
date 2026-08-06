@@ -23,10 +23,34 @@ SPACE_STYLES = {
 }
 ITEM_DESCRIPTIONS = {
     Item.AUTO_SCALING: "サイコロ前に使用。次の出目を +2 します。",
-    Item.CLOUDFRONT: "サイコロ前に使用。次の出目を +1 します。",
-    Item.COST_EXPLORER: "いつでも使用可能。無駄なコストを見つけて +60 Credits。",
+    Item.CLOUDFRONT: "サイコロ前に使用。次の出目を +2 します。",
+    Item.COST_EXPLORER: "サイコロ前に使用。次の支払日を 50 Credits 軽減します。",
     Item.WAF: "自動防御。DDoS 攻撃を1回無効化します。",
     Item.AWS_BACKUP: "自動防御。次のコスト発生を1回無効化します。",
+    Item.RESERVED_INSTANCE: "サイコロ前に使用。次のコスト発生を半減します。",
+    Item.WELL_ARCHITECTED: "サイコロ前に使用。次のクイズで不正解の選択肢を1つ隠します。",
+    Item.SUPPORT_PLAN: "サイコロ前に使用。次のクイズ失敗ペナルティを無効化します。",
+    Item.TRANSIT_GATEWAY: "サイコロ前に使用。ショートカットで次の出目を +3 します。",
+    Item.LAMBDA: "サイコロ前に使用。次のターンをもう1回行えます。",
+    Item.DDOS_ATTACK: "サイコロ前に使用。相手のWAFがなければ -100 Credits。",
+    Item.NAT_GATEWAY: "サイコロ前に使用。相手のクレジットを -60 します。",
+    Item.CLOUDWATCH_LOGS: "サイコロ前に使用。相手の次の獲得クレジットを半減します。",
+    Item.REGION_RUMOR: "サイコロ前に使用。相手を1ターン休みにします。Multi-AZで防げます。",
+    Item.MULTI_AZ: "自動防御。リージョン障害のうわさを1回無効化します。",
+}
+USABLE_ITEMS = {
+    Item.AUTO_SCALING,
+    Item.CLOUDFRONT,
+    Item.COST_EXPLORER,
+    Item.RESERVED_INSTANCE,
+    Item.WELL_ARCHITECTED,
+    Item.SUPPORT_PLAN,
+    Item.TRANSIT_GATEWAY,
+    Item.LAMBDA,
+    Item.DDOS_ATTACK,
+    Item.NAT_GATEWAY,
+    Item.CLOUDWATCH_LOGS,
+    Item.REGION_RUMOR,
 }
 BOARD_WIDTH = 800
 BOARD_HEIGHT = 480
@@ -353,18 +377,21 @@ def main(page: ft.Page) -> None:
             if player.roll_bonus:
                 card_contents.append(ft.Text(f"次のサイコロ: +{player.roll_bonus}", color="#15803D", size=12))
             if has_started and index == game.current_player_index:
-                usable_items = [item for item in player.items if item in (Item.AUTO_SCALING, Item.CLOUDFRONT, Item.COST_EXPLORER)]
+                usable_items = [item for item in player.items if item in USABLE_ITEMS]
                 if usable_items:
                     card_contents.append(ft.Text("アイテムを使う", weight=ft.FontWeight.BOLD, size=12))
-                    card_contents.extend(
-                        ft.Button(
-                            f"使う: {item.value}",
-                            on_click=lambda event, selected=item: handle_use_item(selected),
-                            tooltip=ITEM_DESCRIPTIONS[item],
-                            width=210,
+                    if player.used_item_this_turn:
+                        card_contents.append(ft.Text("このターンはアイテムを使用済み", size=12, color="#64748B"))
+                    else:
+                        card_contents.extend(
+                            ft.Button(
+                                f"使う: {item.value}",
+                                on_click=lambda event, selected=item: handle_use_item(selected),
+                                tooltip=ITEM_DESCRIPTIONS[item],
+                                width=210,
+                            )
+                            for item in usable_items
                         )
-                        for item in usable_items
-                    )
             player_cards.controls.append(
                 ft.Container(
                     content=ft.Column(card_contents, spacing=2),
@@ -414,7 +441,12 @@ def main(page: ft.Page) -> None:
         title = "🏆 資格試験" if question.is_exam else "❓ AWS クイズ"
         question_area.controls.append(ft.Text(title, size=18, weight=ft.FontWeight.BOLD))
         question_area.controls.append(ft.Text(question.prompt, size=16))
+        hidden_choice = game.consume_quiz_hint(game.current_player_index)
+        if hidden_choice is not None:
+            question_area.controls.append(ft.Text("Well-Architected Review: 不正解の選択肢を1つ除外！", color="#15803D"))
         for index, choice in enumerate(question.choices):
+            if index == hidden_choice:
+                continue
             question_area.controls.append(
                 ft.Button(choice, on_click=lambda event, answer=index: answer_question(answer), width=320)
             )
