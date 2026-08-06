@@ -165,7 +165,7 @@ def main(page: ft.Page) -> None:
         expand=True,
         padding=12,
         border_radius=16,
-        image=ft.DecorationImage(src="images/board-background.png", fit=ft.ImageFit.COVER, opacity=0.35),
+        image=ft.DecorationImage(src="images/board-background.png", fit=ft.BoxFit.COVER, opacity=0.35),
     )
     right_panel = ft.Container(
         content=ft.Column([roll_button, ft.Divider(), status, ft.Divider(), question_area], scroll=ft.ScrollMode.AUTO),

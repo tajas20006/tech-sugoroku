@@ -17,4 +17,4 @@
 - 静的検査: `uv run ruff check .` が成功。
 - 起動確認: Flet Webサーバーが `http://127.0.0.1:8550` でHTTP 200を返した。
 - コミット: `feat: add playable AWS sugoroku MVP`（ローカルコミット済み）
-- Flet 0.86.5 の非推奨API修正: `ft.app` を `ft.run`、`ElevatedButton` を `Button`、旧 alignment 定数を `ft.Alignment.CENTER` に置換。
+- Flet 0.86.5 の互換性修正: `ft.app` を `ft.run`、旧ボタンを `Button`、旧 alignment 定数を `ft.Alignment.CENTER`、`ImageFit` を `BoxFit` に置換。
