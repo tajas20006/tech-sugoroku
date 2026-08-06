@@ -4,6 +4,27 @@
 
 2人が同じ画面で遊び、AWS の基本知識をクイズで学びながら、クレジットを管理してゴールを目指す。
 
+## アーキテクチャ要件
+
+- ゲーム進行を中心ドメインとし、Flet やファイルシステムに依存しない `techsugoroku.domain` に置く。
+- `Game` を対戦セッションの集約ルートとし、プレイヤー、ターン、未回答クイズ、勝者の整合性を一括して管理する。
+- 盤面配置と支払日を不変なドメイン設定として `Board` に集約し、位置判定を UI から分離する。
+- クレジットの下限、アイテム所持上限、アイテム消費などの不変条件は `Player` のドメイン操作を経由して保つ。
+- ユースケースの生成と外部データ取得の境界は `techsugoroku.application` に置き、クイズ取得をポートとして表現する。
+- Markdown の解析とファイル読み込みは `techsugoroku.infrastructure` に置き、ドメイン層から分離する。
+- `main.py` はプレゼンテーション層として、アプリケーション層が構築したゲームを操作する。ゲームルールを重複させない。
+- 既存利用者向けの `game.py` 公開 API は互換ファサードとして維持する。
+- ランダム処理は `random.Random` を注入でき、テストで再現可能にする。
+- 依存方向は `presentation -> application -> domain` および `infrastructure -> application/domain` とし、`domain` は外側の層へ依存しない。
+
+### DDD 化の受け入れ条件
+
+1. `techsugoroku.domain` は Flet とファイル I/O に依存しない。
+2. Markdown クイズリポジトリを差し替えてゲームを生成できる。
+3. 盤面、支払日、クレジット、所持品の不変条件がドメイン単体テストで検証される。
+4. 従来の `from game import Game, Item, Question, SpaceType, load_questions` が引き続き利用できる。
+5. 既存のゲームルールと GUI 演出に回帰がなく、全検証コマンドが成功する。
+
 ## 画面要件
 
 - 60マスの2D盤面を表示する。背景は `assets/images/board-background.png` を使用する。

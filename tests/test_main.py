@@ -38,3 +38,11 @@ def test_main_uses_current_flet_apis() -> None:
     assert "tooltip=ITEM_DESCRIPTIONS[item]" in source
     assert "await focus_current_player()" in source
     assert "position % 10" not in source
+
+
+def test_main_delegates_game_construction_to_the_composition_root() -> None:
+    source = Path("main.py").read_text(encoding="utf-8")
+
+    assert "from techsugoroku.bootstrap import create_default_game" in source
+    assert "game = create_default_game()" in source
+    assert "load_questions" not in source

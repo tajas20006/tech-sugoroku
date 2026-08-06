@@ -6,9 +6,8 @@ import random
 
 import flet as ft
 
-from game import Game, Item, Question, SpaceType, load_questions
-
-QUESTIONS = load_questions(["assets/quiz.md", "assets/quiz-architecture.md"])
+from techsugoroku.bootstrap import create_default_game
+from techsugoroku.domain import Item, Question, SpaceType
 
 SPACE_STYLES = {
     SpaceType.NORMAL: ("#F8FAFC", "·"),
@@ -66,7 +65,7 @@ def main(page: ft.Page) -> None:
     page.padding = 16
     page.bgcolor = "#E0F2FE"
 
-    game = Game(QUESTIONS)
+    game = create_default_game()
     has_started = False
     status = ft.Text("STARTを押して、クラウドの旅を始めよう！", size=18, weight=ft.FontWeight.BOLD)
     board = ft.Stack(width=BOARD_WIDTH, height=BOARD_HEIGHT)
