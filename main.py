@@ -280,6 +280,11 @@ def main(page: ft.Page) -> None:
         status.value = "青プレイヤーのターンです。サイコロを振ろう！"
         page.update()
 
+    async def focus_current_player() -> None:
+        update_camera(game.current_player.position)
+        page.update()
+        await asyncio.sleep(0.38)
+
     def show_question(question: Question) -> None:
         question_area.controls.clear()
         title = "🏆 資格試験" if question.is_exam else "❓ AWS クイズ"
@@ -304,6 +309,7 @@ def main(page: ft.Page) -> None:
     async def roll_dice(event: ft.ControlEvent) -> None:
         if not has_started:
             return
+        await focus_current_player()
         roll_button.disabled = True
         for _ in range(10):
             die_display.value = f"🎲 {random.randint(1, 6)}"
