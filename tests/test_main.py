@@ -23,4 +23,7 @@ def test_main_uses_current_flet_apis() -> None:
     assert "math.cos" in source
     assert "update_camera" in source
     assert "CAMERA_ZOOM" in source
+    assert "CAMERA_OVERVIEW_ZOOM" in source
+    assert "intro_overlay" in source
+    assert "start_button" in source
     assert "position % 10" not in source

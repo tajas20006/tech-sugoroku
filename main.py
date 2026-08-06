@@ -23,8 +23,9 @@ SPACE_STYLES = {
 }
 BOARD_WIDTH = 800
 BOARD_HEIGHT = 480
-CELL_SIZE = 68
+CELL_SIZE = 44
 CAMERA_ZOOM = 1.28
+CAMERA_OVERVIEW_ZOOM = 0.42
 TRACK_CENTER_X = 600
 TRACK_CENTER_Y = 450
 
@@ -35,11 +36,12 @@ def main(page: ft.Page) -> None:
     page.bgcolor = "#E0F2FE"
 
     game = Game(QUESTIONS)
-    status = ft.Text("青プレイヤーのターンです。サイコロを振ろう！", size=18, weight=ft.FontWeight.BOLD)
+    has_started = False
+    status = ft.Text("STARTを押して、クラウドの旅を始めよう！", size=18, weight=ft.FontWeight.BOLD)
     board = ft.Stack(width=BOARD_WIDTH, height=BOARD_HEIGHT)
     player_cards = ft.Column(spacing=8)
     question_area = ft.Column(spacing=10)
-    roll_button = ft.Button("🎲 サイコロを振る", width=220)
+    roll_button = ft.Button("🎲 サイコロを振る", width=220, disabled=True)
     die_display = ft.Text("🎲", size=44, text_align=ft.TextAlign.CENTER)
     die_box = ft.Container(
         content=die_display,
@@ -83,6 +85,30 @@ def main(page: ft.Page) -> None:
         animate_scale=ft.Animation(180, ft.AnimationCurve.EASE_OUT),
         ignore_interactions=True,
     )
+    start_button = ft.Button("▶ START", width=220)
+    intro_overlay = ft.Container(
+        content=ft.Column(
+            [
+                ft.Text("☁️", size=64, text_align=ft.TextAlign.CENTER),
+                ft.Text("AWS すごろく", size=32, weight=ft.FontWeight.BOLD, color="#FFFFFF"),
+                ft.Text("コースを見渡して、クラウドの旅を始めよう！", color="#FFFFFF"),
+                start_button,
+            ],
+            alignment=ft.MainAxisAlignment.CENTER,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=12,
+        ),
+        left=0,
+        top=0,
+        width=BOARD_WIDTH,
+        height=BOARD_HEIGHT,
+        alignment=ft.Alignment.CENTER,
+        bgcolor="#0F172ACC",
+        border_radius=16,
+        opacity=1,
+        animate_opacity=ft.Animation(350, ft.AnimationCurve.EASE_OUT),
+        ignore_interactions=False,
+    )
     token_controls = [
         ft.Container(
             content=ft.Image(src=f"images/tokens/player-{color}.png", width=42, height=42),
@@ -99,27 +125,30 @@ def main(page: ft.Page) -> None:
 
     def world_coordinates(position: int) -> tuple[float, float]:
         angle = math.tau * position / 60 - math.pi / 2
-        radius = 285 + 56 * math.sin(angle * 3) + 34 * math.cos(angle * 5)
+        radius = 470 + 10 * math.sin(angle * 3) + 8 * math.cos(angle * 5)
         return (
             TRACK_CENTER_X + radius * math.cos(angle),
-            TRACK_CENTER_Y + radius * 0.62 * math.sin(angle),
+            TRACK_CENTER_Y + radius * 0.80 * math.sin(angle),
         )
 
-    def screen_coordinates(position: int, focus_position: int) -> tuple[float, float]:
+    def screen_coordinates(position: int, focus_position: int | None, zoom: float) -> tuple[float, float]:
         world_x, world_y = world_coordinates(position)
-        focus_x, focus_y = world_coordinates(focus_position)
+        focus_x, focus_y = world_coordinates(focus_position) if focus_position is not None else (TRACK_CENTER_X, TRACK_CENTER_Y)
         return (
-            BOARD_WIDTH / 2 + (world_x - focus_x) * CAMERA_ZOOM,
-            BOARD_HEIGHT / 2 + (world_y - focus_y) * CAMERA_ZOOM,
+            BOARD_WIDTH / 2 + (world_x - focus_x) * zoom,
+            BOARD_HEIGHT / 2 + (world_y - focus_y) * zoom,
         )
 
-    def update_camera(focus_position: int) -> None:
+    def update_camera(focus_position: int | None, zoom: float = CAMERA_ZOOM) -> None:
+        element_scale = zoom / CAMERA_ZOOM
         for position, space in enumerate(space_controls):
-            x, y = screen_coordinates(position, focus_position)
+            x, y = screen_coordinates(position, focus_position, zoom)
             space.left, space.top = x - CELL_SIZE / 2, y - CELL_SIZE / 2
+            space.scale = ft.Scale(element_scale)
         for index, token in enumerate(token_controls):
-            x, y = screen_coordinates(visual_positions[index], focus_position)
+            x, y = screen_coordinates(visual_positions[index], focus_position, zoom)
             token.left, token.top = x - 22 + index * 10, y - 18
+            token.scale = ft.Scale(element_scale)
 
     def create_board() -> None:
         board.controls.clear()
@@ -150,12 +179,15 @@ def main(page: ft.Page) -> None:
                     alignment=ft.Alignment.CENTER,
                     width=CELL_SIZE,
                     height=CELL_SIZE,
+                    animate_position=ft.Animation(360, ft.AnimationCurve.EASE_OUT),
+                    animate_scale=ft.Animation(360, ft.AnimationCurve.EASE_OUT),
                 )
             space_controls.append(space)
             board.controls.append(space)
         board.controls.extend(token_controls)
         board.controls.append(event_banner)
         board.controls.append(cutin_overlay)
+        board.controls.append(intro_overlay)
 
     def sync_tokens(focus_position: int) -> None:
         for index, player in enumerate(game.players):
@@ -236,7 +268,17 @@ def main(page: ft.Page) -> None:
 
     def clear_question() -> None:
         question_area.controls.clear()
-        roll_button.disabled = game.pending_question is not None or game.winner_index is not None
+        roll_button.disabled = not has_started or game.pending_question is not None or game.winner_index is not None
+
+    def start_game(event: ft.ControlEvent) -> None:
+        nonlocal has_started
+        has_started = True
+        intro_overlay.opacity = 0
+        intro_overlay.ignore_interactions = True
+        update_camera(game.current_player.position)
+        roll_button.disabled = False
+        status.value = "青プレイヤーのターンです。サイコロを振ろう！"
+        page.update()
 
     def show_question(question: Question) -> None:
         question_area.controls.clear()
@@ -260,6 +302,8 @@ def main(page: ft.Page) -> None:
         page.update()
 
     async def roll_dice(event: ft.ControlEvent) -> None:
+        if not has_started:
+            return
         roll_button.disabled = True
         for _ in range(10):
             die_display.value = f"🎲 {random.randint(1, 6)}"
@@ -292,8 +336,9 @@ def main(page: ft.Page) -> None:
         page.update()
 
     roll_button.on_click = roll_dice
+    start_button.on_click = start_game
     create_board()
-    sync_tokens(game.current_player.position)
+    update_camera(None, CAMERA_OVERVIEW_ZOOM)
     redraw_players()
 
     left_panel = ft.Container(content=player_cards, width=260, padding=12, bgcolor="#DBEAFE", border_radius=16)
