@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import random
 
 import flet as ft
@@ -22,7 +23,10 @@ SPACE_STYLES = {
 }
 BOARD_WIDTH = 800
 BOARD_HEIGHT = 480
-CELL_SIZE = 80
+CELL_SIZE = 68
+CAMERA_ZOOM = 1.28
+TRACK_CENTER_X = 600
+TRACK_CENTER_Y = 450
 
 
 def main(page: ft.Page) -> None:
@@ -90,11 +94,32 @@ def main(page: ft.Page) -> None:
         )
         for color in ("blue", "pink")
     ]
+    space_controls: list[ft.Container] = []
+    visual_positions = [player.position for player in game.players]
 
-    def token_coordinates(player_index: int, position: int) -> tuple[int, int]:
-        column = position % 10
-        row = position // 10
-        return column * CELL_SIZE + 16 + player_index * 22, row * CELL_SIZE + 31
+    def world_coordinates(position: int) -> tuple[float, float]:
+        angle = math.tau * position / 60 - math.pi / 2
+        radius = 285 + 56 * math.sin(angle * 3) + 34 * math.cos(angle * 5)
+        return (
+            TRACK_CENTER_X + radius * math.cos(angle),
+            TRACK_CENTER_Y + radius * 0.62 * math.sin(angle),
+        )
+
+    def screen_coordinates(position: int, focus_position: int) -> tuple[float, float]:
+        world_x, world_y = world_coordinates(position)
+        focus_x, focus_y = world_coordinates(focus_position)
+        return (
+            BOARD_WIDTH / 2 + (world_x - focus_x) * CAMERA_ZOOM,
+            BOARD_HEIGHT / 2 + (world_y - focus_y) * CAMERA_ZOOM,
+        )
+
+    def update_camera(focus_position: int) -> None:
+        for position, space in enumerate(space_controls):
+            x, y = screen_coordinates(position, focus_position)
+            space.left, space.top = x - CELL_SIZE / 2, y - CELL_SIZE / 2
+        for index, token in enumerate(token_controls):
+            x, y = screen_coordinates(visual_positions[index], focus_position)
+            token.left, token.top = x - 22 + index * 10, y - 18
 
     def create_board() -> None:
         board.controls.clear()
@@ -110,8 +135,7 @@ def main(page: ft.Page) -> None:
             space_type = game.space_at(position)
             color, marker = SPACE_STYLES[space_type]
             label = "START" if position == 0 else marker
-            board.controls.append(
-                ft.Container(
+            space = ft.Container(
                     content=ft.Column(
                         [
                             ft.Text(str(position), size=10, color="#334155"),
@@ -124,24 +148,25 @@ def main(page: ft.Page) -> None:
                     border_radius=10,
                     padding=4,
                     alignment=ft.Alignment.CENTER,
-                    left=(position % 10) * CELL_SIZE + 3,
-                    top=(position // 10) * CELL_SIZE + 3,
-                    width=CELL_SIZE - 6,
-                    height=CELL_SIZE - 6,
+                    width=CELL_SIZE,
+                    height=CELL_SIZE,
                 )
-            )
+            space_controls.append(space)
+            board.controls.append(space)
         board.controls.extend(token_controls)
         board.controls.append(event_banner)
         board.controls.append(cutin_overlay)
 
-    def sync_tokens() -> None:
+    def sync_tokens(focus_position: int) -> None:
         for index, player in enumerate(game.players):
-            token_controls[index].left, token_controls[index].top = token_coordinates(index, player.position)
+            visual_positions[index] = player.position
+        update_camera(focus_position)
 
     async def animate_token(player_index: int, start: int, destination: int) -> None:
         for position in range(start + 1, destination + 1):
             token = token_controls[player_index]
-            token.left, token.top = token_coordinates(player_index, position)
+            visual_positions[player_index] = position
+            update_camera(position)
             token.scale = ft.Scale(1.18)
             page.update()
             await asyncio.sleep(0.11)
@@ -230,7 +255,7 @@ def main(page: ft.Page) -> None:
         outcome = "正解！" if correct else "不正解。"
         status.value = f"{outcome} {question.explanation if question else ''}"
         clear_question()
-        sync_tokens()
+        sync_tokens(game.players[game.current_player_index].position)
         redraw_players()
         page.update()
 
@@ -253,7 +278,7 @@ def main(page: ft.Page) -> None:
         result = game.take_turn(roll)
         landing_position = min(59, start_position + result.roll)
         await animate_token(result.player_index, start_position, landing_position)
-        sync_tokens()
+        sync_tokens(game.players[result.player_index].position)
         status.value = f"{game.players[result.player_index].name}: {result.roll} を出した。{result.message}"
         redraw_players()
         if result.payment_message and result.space_type is not SpaceType.PAYMENT:
@@ -268,7 +293,7 @@ def main(page: ft.Page) -> None:
 
     roll_button.on_click = roll_dice
     create_board()
-    sync_tokens()
+    sync_tokens(game.current_player.position)
     redraw_players()
 
     left_panel = ft.Container(content=player_cards, width=260, padding=12, bgcolor="#DBEAFE", border_radius=16)
