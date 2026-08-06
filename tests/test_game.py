@@ -1,4 +1,4 @@
-from game import Game, Item, Question, SpaceType
+from game import Game, Item, Question, SpaceType, load_questions
 
 
 def make_game() -> Game:
@@ -22,7 +22,7 @@ def test_gain_space_moves_current_player_and_ends_turn() -> None:
 
     assert result.space_type is SpaceType.GAIN
     assert game.players[0].position == 3
-    assert game.players[0].credits == 280
+    assert game.players[0].credits == 400
     assert game.current_player_index == 1
 
 
@@ -42,18 +42,18 @@ def test_payment_deducts_required_credits_when_affordable() -> None:
     game.take_turn(1)
 
     assert game.players[0].position == 15
-    assert game.players[0].credits == 50
+    assert game.players[0].credits == 200
 
 
 def test_payment_returns_to_previous_checkpoint_when_unaffordable() -> None:
     game = make_game()
     game.players[0].position = 14
-    game.players[0].credits = 100
+    game.players[0].credits = 50
 
     game.take_turn(1)
 
     assert game.players[0].position == 0
-    assert game.players[0].credits == 100
+    assert game.players[0].credits == 50
 
 
 def test_quiz_waits_for_answer_then_rewards_correct_answer() -> None:
@@ -65,7 +65,7 @@ def test_quiz_waits_for_answer_then_rewards_correct_answer() -> None:
     assert result.question is not None
     assert game.current_player_index == 0
     game.answer_question(0)
-    assert game.players[0].credits == 280
+    assert game.players[0].credits == 400
     assert game.current_player_index == 1
 
 
@@ -75,7 +75,7 @@ def test_waf_blocks_ddos_and_is_consumed() -> None:
 
     game.apply_ddos(0)
 
-    assert game.players[0].credits == 200
+    assert game.players[0].credits == 300
     assert Item.WAF not in game.players[0].items
 
 
@@ -97,3 +97,22 @@ def test_player_wins_only_after_final_payment() -> None:
     game.take_turn(1)
 
     assert game.winner_index == 0
+
+
+def test_normal_questions_do_not_repeat_before_the_deck_is_exhausted() -> None:
+    questions = [
+        Question(f"Question {index}", ("A", "B", "C", "D"), 0, "Explanation")
+        for index in range(3)
+    ]
+    game = Game(questions=questions, rng_seed=7)
+
+    asked = [game._next_question(False).prompt for _ in range(3)]
+
+    assert len(set(asked)) == 3
+
+
+def test_load_questions_reads_the_project_question_banks() -> None:
+    questions = load_questions(["assets/quiz.md", "assets/quiz-architecture.md"])
+
+    assert len(questions) >= 50
+    assert all(len(question.choices) == 4 for question in questions)

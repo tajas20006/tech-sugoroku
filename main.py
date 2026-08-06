@@ -1,45 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import random
 
 import flet as ft
 
-from game import Game, Question, SpaceType
+from game import Game, Question, SpaceType, load_questions
 
-QUESTIONS = [
-    Question(
-        "オブジェクトストレージとして使う AWS サービスは？",
-        ("Amazon S3", "Amazon EC2", "Amazon RDS", "Amazon Route 53"),
-        0,
-        "Amazon S3 はオブジェクトストレージサービスです。",
-    ),
-    Question(
-        "Web アプリへの不正な HTTP(S) リクエストをルールで防ぐサービスは？",
-        ("AWS WAF", "AWS KMS", "Amazon EFS", "Amazon SNS"),
-        0,
-        "AWS WAF は Web リクエストをルールでフィルタリングします。",
-    ),
-    Question(
-        "高可用性を高める RDS の構成は？",
-        ("Multi-AZ", "単一 AZ", "手動バックアップのみ", "最大サイズへ変更"),
-        0,
-        "Multi-AZ は障害時の自動フェイルオーバーを提供します。",
-    ),
-    Question(
-        "S3 のログを低コストなストレージクラスへ自動移行する機能は？",
-        ("S3 Lifecycle", "S3 ACL", "CloudTrail", "Route 53"),
-        0,
-        "S3 Lifecycle ルールでストレージクラスを移行できます。",
-        is_exam=True,
-    ),
-    Question(
-        "CloudFront 配信で過剰なリクエストを送る送信元を制限する設定は？",
-        ("AWS WAF のレートベースルール", "EBS 暗号化", "IAM ユーザー", "S3 バケットポリシー"),
-        0,
-        "WAF のレートベースルールはリクエスト数に応じて送信元を制限します。",
-        is_exam=True,
-    ),
-]
+QUESTIONS = load_questions(["assets/quiz.md", "assets/quiz-architecture.md"])
 
 SPACE_STYLES = {
     SpaceType.NORMAL: ("#F8FAFC", "·"),
@@ -65,6 +33,7 @@ def main(page: ft.Page) -> None:
     player_cards = ft.Column(spacing=8)
     question_area = ft.Column(spacing=10)
     roll_button = ft.Button("🎲 サイコロを振る", width=220)
+    die_display = ft.Text("🎲", size=44, text_align=ft.TextAlign.CENTER)
 
     def token_for(position: int) -> str:
         tokens: list[str] = []
@@ -143,8 +112,15 @@ def main(page: ft.Page) -> None:
         redraw_players()
         page.update()
 
-    def roll_dice(event: ft.ControlEvent) -> None:
+    async def roll_dice(event: ft.ControlEvent) -> None:
+        roll_button.disabled = True
+        for _ in range(10):
+            die_display.value = f"🎲 {random.randint(1, 6)}"
+            status.value = "サイコロが回転中……"
+            page.update()
+            await asyncio.sleep(0.08)
         roll = random.randint(1, 6)
+        die_display.value = f"🎲 {roll}"
         result = game.take_turn(roll)
         status.value = f"{game.players[result.player_index].name}: {result.roll} を出した。{result.message}"
         redraw_board()
@@ -168,7 +144,7 @@ def main(page: ft.Page) -> None:
         image=ft.DecorationImage(src="images/board-background.png", fit=ft.BoxFit.COVER, opacity=0.35),
     )
     right_panel = ft.Container(
-        content=ft.Column([roll_button, ft.Divider(), status, ft.Divider(), question_area], scroll=ft.ScrollMode.AUTO),
+        content=ft.Column([die_display, roll_button, ft.Divider(), status, ft.Divider(), question_area], scroll=ft.ScrollMode.AUTO),
         width=350,
         padding=12,
         bgcolor="#F8FAFC",

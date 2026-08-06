@@ -18,3 +18,6 @@
 - 起動確認: Flet Webサーバーが `http://127.0.0.1:8550` でHTTP 200を返した。
 - コミット: `feat: add playable AWS sugoroku MVP`（ローカルコミット済み）
 - Flet 0.86.5 の互換性修正: `ft.app` を `ft.run`、旧ボタンを `Button`、旧 alignment 定数を `ft.Alignment.CENTER`、`ImageFit` を `BoxFit` に置換。
+- バランス調整: 初期クレジットを300に増やし、支払日を100/180/280/400へ緩和。通常クイズマスを12か所に増やした。
+- 質問: `assets/quiz.md` と `assets/quiz-architecture.md` から56問を読み込み、カテゴリ別デッキを使い切るまで重複しない。
+- 演出: サイコロを10フレーム切り替えてから最終出目を確定する。

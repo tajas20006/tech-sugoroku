@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 
 
 class SpaceType(str, Enum):
@@ -37,7 +38,7 @@ class Player:
     name: str
     color: str
     position: int = 0
-    credits: int = 200
+    credits: int = 300
     items: list[Item] = field(default_factory=list)
     badges: int = 0
     final_payment_paid: bool = False
@@ -55,7 +56,7 @@ class TurnResult:
 SPACE_MAP: dict[int, SpaceType] = {
     **{position: SpaceType.GAIN for position in (3, 12, 20, 28, 38, 48)},
     **{position: SpaceType.LOSS for position in (6, 18, 26, 42, 52)},
-    **{position: SpaceType.QUIZ for position in (8, 22, 35, 50)},
+    **{position: SpaceType.QUIZ for position in (5, 8, 13, 17, 22, 27, 35, 39, 44, 50, 53, 57)},
     **{position: SpaceType.PAYMENT for position in (15, 30, 45, 55)},
     **{position: SpaceType.ITEM for position in (10, 32, 47)},
     25: SpaceType.SUMMIT,
@@ -63,7 +64,49 @@ SPACE_MAP: dict[int, SpaceType] = {
     54: SpaceType.EXAM,
     59: SpaceType.GOAL,
 }
-PAYMENTS = {15: 150, 30: 300, 45: 500, 55: 800}
+PAYMENTS = {15: 100, 30: 180, 45: 280, 55: 400}
+
+
+def load_questions(paths: list[str | Path]) -> list[Question]:
+    """Load de-duplicated four-choice questions from Markdown asset files."""
+    questions: list[Question] = []
+    seen_prompts: set[str] = set()
+    for path in paths:
+        is_exam = False
+        current: dict[str, str] = {}
+
+        def add_current(question_data: dict[str, str], exam: bool) -> None:
+            if not {"prompt", "choices", "answer", "explanation"} <= question_data.keys():
+                return
+            choices = tuple(question_data["choices"].split(" / "))
+            if len(choices) != 4 or question_data["answer"] not in choices:
+                return
+            prompt = question_data["prompt"]
+            if prompt in seen_prompts:
+                return
+            seen_prompts.add(prompt)
+            questions.append(
+                Question(prompt, (choices[0], choices[1], choices[2], choices[3]), choices.index(question_data["answer"]), question_data["explanation"], exam)
+            )
+
+        for line in Path(path).read_text(encoding="utf-8").splitlines():
+            if line.startswith("## "):
+                add_current(current, is_exam)
+                current = {}
+                is_exam = "資格試験" in line
+            elif line.startswith("### "):
+                add_current(current, is_exam)
+                current = {}
+            elif line.startswith("- 問題: "):
+                current["prompt"] = line.removeprefix("- 問題: ")
+            elif line.startswith("- 選択肢: "):
+                current["choices"] = line.removeprefix("- 選択肢: ")
+            elif line.startswith("- 正解: "):
+                current["answer"] = line.removeprefix("- 正解: ")
+            elif line.startswith("- 解説: "):
+                current["explanation"] = line.removeprefix("- 解説: ")
+        add_current(current, is_exam)
+    return questions
 
 
 class Game:
@@ -77,6 +120,7 @@ class Game:
         self.pending_question: Question | None = None
         self.pending_player_index: int | None = None
         self.winner_index: int | None = None
+        self.question_decks: dict[bool, list[Question]] = {False: [], True: []}
 
     @property
     def current_player(self) -> Player:
@@ -126,11 +170,11 @@ class Game:
         question = self.pending_question
         correct = answer_index == question.answer_index
         if correct:
-            player.credits += 250 if question.is_exam else 80
+            player.credits += 300 if question.is_exam else 100
             if question.is_exam:
                 player.badges += 1
         else:
-            self._lose_credits(player, 150 if question.is_exam else 40)
+            self._lose_credits(player, 80 if question.is_exam else 20)
         self.pending_question = None
         self.pending_player_index = None
         self._end_turn()
@@ -159,13 +203,13 @@ class Game:
 
     def _resolve_space(self, player: Player, space_type: SpaceType) -> str:
         if space_type is SpaceType.GAIN:
-            player.credits += 80
-            return "コスト最適化に成功！ +80 Credits"
+            player.credits += 100
+            return "コスト最適化に成功！ +100 Credits"
         if space_type is SpaceType.LOSS:
             if self._consume_item(player, Item.AWS_BACKUP):
                 return "AWS Backup が損失を防いだ！"
-            self._lose_credits(player, 60)
-            return "OpenSearch にお金を溶かした。-60 Credits"
+            self._lose_credits(player, 40)
+            return "OpenSearch にお金を溶かした。-40 Credits"
         if space_type is SpaceType.ITEM:
             if len(player.items) < 3:
                 item = self.rng.choice(list(Item))
@@ -188,7 +232,10 @@ class Game:
     def _next_question(self, is_exam: bool) -> Question:
         candidates = [question for question in self.questions if question.is_exam == is_exam]
         source = candidates or self.questions
-        question = self.rng.choice(source)
+        if not self.question_decks[is_exam]:
+            self.question_decks[is_exam] = source.copy()
+            self.rng.shuffle(self.question_decks[is_exam])
+        question = self.question_decks[is_exam].pop()
         return Question(
             prompt=question.prompt,
             choices=question.choices,
