@@ -93,6 +93,7 @@ def main(page: ft.Page) -> None:
         ignore_interactions=True,
     )
     start_button = ft.Button("▶ START", width=220)
+    how_to_button = ft.Button("❔ 遊び方", width=220)
     intro_overlay = ft.Container(
         content=ft.Column(
             [
@@ -100,6 +101,7 @@ def main(page: ft.Page) -> None:
                 ft.Text("AWS すごろく", size=32, weight=ft.FontWeight.BOLD, color="#FFFFFF"),
                 ft.Text("コースを見渡して、クラウドの旅を始めよう！", color="#FFFFFF"),
                 start_button,
+                how_to_button,
             ],
             alignment=ft.MainAxisAlignment.CENTER,
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -115,6 +117,79 @@ def main(page: ft.Page) -> None:
         opacity=1,
         animate_opacity=ft.Animation(350, ft.AnimationCurve.EASE_OUT),
         ignore_interactions=False,
+    )
+    close_how_to_button = ft.Button("閉じる", width=180)
+    how_to_overlay = ft.Container(
+        content=ft.Column(
+            [
+                ft.Text("遊び方", size=30, weight=ft.FontWeight.BOLD, color="#FFFFFF"),
+                ft.Text("知識とクレジットを集め、支払日を乗り越えてGOALを目指そう！", color="#FFFFFF"),
+                ft.Row(
+                    [
+                        ft.Container(
+                            content=ft.Column(
+                                [ft.Text("🎲", size=42), ft.Text("1. サイコロ", weight=ft.FontWeight.BOLD), ft.Text("出目の数だけ進む", size=12)],
+                                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                            width=170,
+                            padding=12,
+                            alignment=ft.Alignment.CENTER,
+                            bgcolor="#1D4ED8",
+                            border_radius=12,
+                        ),
+                        ft.Container(
+                            content=ft.Column(
+                                [ft.Image(src="images/tokens/player-blue.png", width=50, height=50), ft.Text("2. マス効果", weight=ft.FontWeight.BOLD), ft.Text("クイズで学んで稼ぐ", size=12)],
+                                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                            width=170,
+                            padding=12,
+                            alignment=ft.Alignment.CENTER,
+                            bgcolor="#7C3AED",
+                            border_radius=12,
+                        ),
+                        ft.Container(
+                            content=ft.Column(
+                                [ft.Text("🧾", size=42), ft.Text("3. 支払日", weight=ft.FontWeight.BOLD), ft.Text("クレジット不足に注意", size=12)],
+                                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                            width=170,
+                            padding=12,
+                            alignment=ft.Alignment.CENTER,
+                            bgcolor="#C2410C",
+                            border_radius=12,
+                        ),
+                        ft.Container(
+                            content=ft.Column(
+                                [ft.Image(src="images/items/auto-scaling.png", width=50, height=50), ft.Text("4. アイテム", weight=ft.FontWeight.BOLD), ft.Text("有利なタイミングで使う", size=12)],
+                                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                            width=170,
+                            padding=12,
+                            alignment=ft.Alignment.CENTER,
+                            bgcolor="#047857",
+                            border_radius=12,
+                        ),
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    spacing=10,
+                ),
+                close_how_to_button,
+            ],
+            alignment=ft.MainAxisAlignment.CENTER,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=14,
+        ),
+        left=0,
+        top=0,
+        width=BOARD_WIDTH,
+        height=BOARD_HEIGHT,
+        alignment=ft.Alignment.CENTER,
+        bgcolor="#172554F5",
+        border_radius=16,
+        opacity=0,
+        animate_opacity=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
+        ignore_interactions=True,
     )
     token_controls = [
         ft.Container(
@@ -195,6 +270,7 @@ def main(page: ft.Page) -> None:
         board.controls.append(event_banner)
         board.controls.append(cutin_overlay)
         board.controls.append(intro_overlay)
+        board.controls.append(how_to_overlay)
 
     def sync_tokens(focus_position: int) -> None:
         for index, player in enumerate(game.players):
@@ -317,6 +393,16 @@ def main(page: ft.Page) -> None:
         status.value = "青プレイヤーのターンです。サイコロを振ろう！"
         page.update()
 
+    def show_how_to(event: ft.ControlEvent) -> None:
+        how_to_overlay.opacity = 1
+        how_to_overlay.ignore_interactions = False
+        page.update()
+
+    def close_how_to(event: ft.ControlEvent) -> None:
+        how_to_overlay.opacity = 0
+        how_to_overlay.ignore_interactions = True
+        page.update()
+
     async def focus_current_player() -> None:
         update_camera(game.current_player.position)
         page.update()
@@ -381,6 +467,8 @@ def main(page: ft.Page) -> None:
 
     roll_button.on_click = roll_dice
     start_button.on_click = start_game
+    how_to_button.on_click = show_how_to
+    close_how_to_button.on_click = close_how_to
     create_board()
     update_camera(None, CAMERA_OVERVIEW_ZOOM)
     redraw_players()

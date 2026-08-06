@@ -28,6 +28,9 @@ def test_main_uses_current_flet_apis() -> None:
     assert "start_button" in source
     assert "focus_current_player" in source
     assert "await focus_current_player()" in source
+    assert "遊び方" in source
+    assert "how_to_overlay" in source
+    assert "show_how_to" in source
     assert "use_item" in source
     assert "アイテムを使う" in source
     assert "ITEM_DESCRIPTIONS" in source
