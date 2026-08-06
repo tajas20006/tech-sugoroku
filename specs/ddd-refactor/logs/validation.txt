@@ -1,0 +1,9 @@
+DDD refactor validation summary
+
+- uv run pytest -q: 29 passed
+- uv run pytest -q --cov=techsugoroku --cov-report=term: 29 passed, 82% total coverage
+- uv run ruff check .: All checks passed
+- uv run python -Wd -c "import main; print('main import ok')": main import ok
+- Flet web startup on port 8561: HTTP 200
+- In-app browser: unavailable in this environment; visual interaction was not performed
+- Temporary Flet processes: stopped; port 8561 confirmed closed
