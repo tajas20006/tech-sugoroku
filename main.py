@@ -360,6 +360,7 @@ def main(page: ft.Page) -> None:
                         ft.Button(
                             f"使う: {item.value}",
                             on_click=lambda event, selected=item: handle_use_item(selected),
+                            tooltip=ITEM_DESCRIPTIONS[item],
                             width=210,
                         )
                         for item in usable_items

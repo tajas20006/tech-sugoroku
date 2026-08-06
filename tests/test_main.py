@@ -35,5 +35,6 @@ def test_main_uses_current_flet_apis() -> None:
     assert "アイテムを使う" in source
     assert "ITEM_DESCRIPTIONS" in source
     assert "tooltip=ITEM_DESCRIPTIONS" in source
+    assert "tooltip=ITEM_DESCRIPTIONS[item]" in source
     assert "await focus_current_player()" in source
     assert "position % 10" not in source
