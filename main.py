@@ -6,7 +6,7 @@ import random
 
 import flet as ft
 
-from game import Game, Question, SpaceType, load_questions
+from game import Game, Item, Question, SpaceType, load_questions
 
 QUESTIONS = load_questions(["assets/quiz.md", "assets/quiz-architecture.md"])
 
@@ -250,16 +250,28 @@ def main(page: ft.Page) -> None:
         for index, player in enumerate(game.players):
             active = " ← TURN" if index == game.current_player_index and game.winner_index is None else ""
             items = "、".join(item.value for item in player.items) or "なし"
+            card_contents: list[ft.Control] = [
+                ft.Text(f"{'🔵' if index == 0 else '🩷'} {player.name}{active}", weight=ft.FontWeight.BOLD),
+                ft.Text(f"位置: {player.position} / Credits: {player.credits}"),
+                ft.Text(f"アイテム: {items}", size=12),
+            ]
+            if player.roll_bonus:
+                card_contents.append(ft.Text(f"次のサイコロ: +{player.roll_bonus}", color="#15803D", size=12))
+            if has_started and index == game.current_player_index:
+                usable_items = [item for item in player.items if item in (Item.AUTO_SCALING, Item.CLOUDFRONT, Item.COST_EXPLORER)]
+                if usable_items:
+                    card_contents.append(ft.Text("アイテムを使う", weight=ft.FontWeight.BOLD, size=12))
+                    card_contents.extend(
+                        ft.Button(
+                            f"使う: {item.value}",
+                            on_click=lambda event, selected=item: handle_use_item(selected),
+                            width=210,
+                        )
+                        for item in usable_items
+                    )
             player_cards.controls.append(
                 ft.Container(
-                    content=ft.Column(
-                        [
-                            ft.Text(f"{'🔵' if index == 0 else '🩷'} {player.name}{active}", weight=ft.FontWeight.BOLD),
-                            ft.Text(f"位置: {player.position} / Credits: {player.credits}"),
-                            ft.Text(f"アイテム: {items}", size=12),
-                        ],
-                        spacing=2,
-                    ),
+                    content=ft.Column(card_contents, spacing=2),
                     padding=10,
                     border_radius=10,
                     bgcolor="#FFFFFFCC",
@@ -269,6 +281,12 @@ def main(page: ft.Page) -> None:
     def clear_question() -> None:
         question_area.controls.clear()
         roll_button.disabled = not has_started or game.pending_question is not None or game.winner_index is not None
+
+    def handle_use_item(item: Item) -> None:
+        message = game.use_item(game.current_player_index, item)
+        status.value = message
+        redraw_players()
+        page.update()
 
     def start_game(event: ft.ControlEvent) -> None:
         nonlocal has_started

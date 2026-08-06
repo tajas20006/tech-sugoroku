@@ -22,6 +22,8 @@ class Item(str, Enum):
     WAF = "WAF"
     AUTO_SCALING = "Auto Scaling"
     AWS_BACKUP = "AWS Backup"
+    COST_EXPLORER = "Cost Explorer"
+    CLOUDFRONT = "CloudFront"
 
 
 @dataclass(frozen=True)
@@ -42,6 +44,7 @@ class Player:
     items: list[Item] = field(default_factory=list)
     badges: int = 0
     final_payment_paid: bool = False
+    roll_bonus: int = 0
 
 
 @dataclass
@@ -59,7 +62,7 @@ SPACE_MAP: dict[int, SpaceType] = {
     **{position: SpaceType.LOSS for position in (6, 18, 26, 42, 52)},
     **{position: SpaceType.QUIZ for position in (5, 8, 13, 17, 22, 27, 35, 39, 44, 50, 53, 57)},
     **{position: SpaceType.PAYMENT for position in (15, 30, 45, 55)},
-    **{position: SpaceType.ITEM for position in (10, 32, 47)},
+    **{position: SpaceType.ITEM for position in (2, 10, 16, 24, 32, 37, 47, 51, 56)},
     25: SpaceType.SUMMIT,
     40: SpaceType.EXAM,
     54: SpaceType.EXAM,
@@ -140,7 +143,8 @@ class Game:
 
         player_index = self.current_player_index
         player = self.current_player
-        actual_roll = min(6, roll + self._consume_item(player, Item.AUTO_SCALING, bonus=2))
+        actual_roll = min(6, roll + player.roll_bonus)
+        player.roll_bonus = 0
         start = player.position
         player.position = min(59, player.position + actual_roll)
         payment_failure, payment_message = self._process_payments(player, start)
@@ -189,6 +193,28 @@ class Game:
         self._lose_credits(player, 100)
         return False
 
+    def use_item(self, player_index: int, item: Item) -> str:
+        if player_index != self.current_player_index:
+            raise ValueError("Only the current player can use an item.")
+        if self.pending_question is not None:
+            raise ValueError("Answer the current question first.")
+        player = self.players[player_index]
+        if item not in player.items:
+            raise ValueError("The player does not own this item.")
+        if item is Item.AUTO_SCALING:
+            player.items.remove(item)
+            player.roll_bonus += 2
+            return "Auto Scaling を使用！ 次のサイコロに +2。"
+        if item is Item.CLOUDFRONT:
+            player.items.remove(item)
+            player.roll_bonus += 1
+            return "CloudFront を使用！ 次のサイコロに +1。"
+        if item is Item.COST_EXPLORER:
+            player.items.remove(item)
+            player.credits += 60
+            return "Cost Explorer で無駄を発見！ +60 Credits"
+        return f"{item.value} は自動防御アイテムです。"
+
     def _process_payments(self, player: Player, start: int) -> tuple[str | None, str | None]:
         payment_message: str | None = None
         for position, cost in PAYMENTS.items():
@@ -210,7 +236,8 @@ class Game:
             player.credits += 100
             return "コスト最適化に成功！ +100 Credits"
         if space_type is SpaceType.LOSS:
-            if self._consume_item(player, Item.AWS_BACKUP):
+            if Item.AWS_BACKUP in player.items:
+                player.items.remove(Item.AWS_BACKUP)
                 return "AWS Backup が損失を防いだ！"
             self._lose_credits(player, 40)
             return "OpenSearch にお金を溶かした。-40 Credits"

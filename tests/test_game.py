@@ -93,10 +93,29 @@ def test_auto_scaling_adds_two_to_next_roll() -> None:
     game = make_game()
     game.players[0].items.append(Item.AUTO_SCALING)
 
+    game.use_item(0, Item.AUTO_SCALING)
     game.take_turn(4)
 
     assert game.players[0].position == 6
     assert Item.AUTO_SCALING not in game.players[0].items
+
+
+def test_cost_explorer_can_be_used_for_immediate_credits() -> None:
+    game = make_game()
+    game.players[0].items.append(Item.COST_EXPLORER)
+
+    message = game.use_item(0, Item.COST_EXPLORER)
+
+    assert game.players[0].credits == 360
+    assert Item.COST_EXPLORER not in game.players[0].items
+    assert "Cost Explorer" in message
+
+
+def test_item_spaces_are_available_more_often() -> None:
+    game = make_game()
+
+    assert game.space_at(2) is SpaceType.ITEM
+    assert game.space_at(56) is SpaceType.ITEM
 
 
 def test_player_wins_only_after_final_payment() -> None:
