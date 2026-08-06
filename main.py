@@ -21,6 +21,13 @@ SPACE_STYLES = {
     SpaceType.EXAM: ("#FDE68A", "🏆"),
     SpaceType.GOAL: ("#FDE68A", "GOAL"),
 }
+ITEM_DESCRIPTIONS = {
+    Item.AUTO_SCALING: "サイコロ前に使用。次の出目を +2 します。",
+    Item.CLOUDFRONT: "サイコロ前に使用。次の出目を +1 します。",
+    Item.COST_EXPLORER: "いつでも使用可能。無駄なコストを見つけて +60 Credits。",
+    Item.WAF: "自動防御。DDoS 攻撃を1回無効化します。",
+    Item.AWS_BACKUP: "自動防御。次のコスト発生を1回無効化します。",
+}
 BOARD_WIDTH = 800
 BOARD_HEIGHT = 480
 CELL_SIZE = 44
@@ -249,12 +256,24 @@ def main(page: ft.Page) -> None:
         player_cards.controls.clear()
         for index, player in enumerate(game.players):
             active = " ← TURN" if index == game.current_player_index and game.winner_index is None else ""
-            items = "、".join(item.value for item in player.items) or "なし"
             card_contents: list[ft.Control] = [
                 ft.Text(f"{'🔵' if index == 0 else '🩷'} {player.name}{active}", weight=ft.FontWeight.BOLD),
                 ft.Text(f"位置: {player.position} / Credits: {player.credits}"),
-                ft.Text(f"アイテム: {items}", size=12),
+                ft.Text("アイテム:", size=12),
             ]
+            if player.items:
+                card_contents.extend(
+                    ft.Container(
+                        content=ft.Text(item.value, size=12),
+                        tooltip=ITEM_DESCRIPTIONS[item],
+                        padding=5,
+                        border_radius=8,
+                        bgcolor="#E0E7FF",
+                    )
+                    for item in player.items
+                )
+            else:
+                card_contents.append(ft.Text("なし", size=12))
             if player.roll_bonus:
                 card_contents.append(ft.Text(f"次のサイコロ: +{player.roll_bonus}", color="#15803D", size=12))
             if has_started and index == game.current_player_index:
@@ -357,6 +376,7 @@ def main(page: ft.Page) -> None:
             show_question(result.question)
         else:
             clear_question()
+            await focus_current_player()
         page.update()
 
     roll_button.on_click = roll_dice
