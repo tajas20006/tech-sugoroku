@@ -69,6 +69,47 @@ SPACE_MAP: dict[int, SpaceType] = {
     59: SpaceType.GOAL,
 }
 PAYMENTS = {15: 100, 30: 180, 45: 280, 55: 400}
+DEFAULT_MESSAGE_POOLS = {
+    "gain": [
+        "S3 のライフサイクル設定でコスト最適化！ +{amount} Credits",
+        "不要な EBS ボリュームを削除した。+{amount} Credits",
+        "Savings Plans を見直して予算に余裕ができた！ +{amount} Credits",
+        "タグ付けを徹底。コストの犯人を特定した！ +{amount} Credits",
+    ],
+    "loss": [
+        "OpenSearch にお金を溶かした。-{amount} Credits",
+        "NAT Gateway を増やしすぎて請求書が育った。-{amount} Credits",
+        "CloudWatch Logs を無期限保存していた。-{amount} Credits",
+        "開発環境を週末も全力稼働させた。-{amount} Credits",
+    ],
+    "payment": [
+        "AWS 利用料を支払った。次のフェーズへ進もう！ -{amount} Credits",
+        "請求アラートが鳴る前に支払い完了。-{amount} Credits",
+        "FinOps 部に褒められた。支払い完了！ -{amount} Credits",
+    ],
+    "item": [
+        "設計レビューの成果！ 「{item}」を手に入れた。",
+        "宝箱から「{item}」を発見！",
+        "AWS の知恵を獲得。「{item}」を手に入れた！",
+    ],
+    "summit_gain": [
+        "AWS Summit の講演で学びを得た！ +{amount} Credits",
+        "SA に相談して構成を改善！ +{amount} Credits",
+        "基調講演のひらめきでコスト削減。+{amount} Credits",
+    ],
+    "summit_item": [
+        "AWS Summit のノベルティから「{item}」を獲得！",
+        "ブース巡りの成果。「{item}」を手に入れた！",
+    ],
+    "ddos": [
+        "DDoS 攻撃が直撃！ -{amount} Credits",
+        "想定外のトラフィック集中！ -{amount} Credits",
+    ],
+    "ddos_defense": [
+        "WAF が DDoS を防いだ！ 被害は出なかった。",
+        "WAF のルールが発動。攻撃をブロック！",
+    ],
+}
 
 
 def load_questions(paths: list[str | Path]) -> list[Question]:
@@ -119,6 +160,7 @@ class Game:
             raise ValueError("At least one question is required.")
         self.questions = questions
         self.rng = random.Random(rng_seed)
+        self.message_pools = {name: messages.copy() for name, messages in DEFAULT_MESSAGE_POOLS.items()}
         self.players = [Player("Player 1", "blue"), Player("Player 2", "pink")]
         self.current_player_index = 0
         self.pending_question: Question | None = None
@@ -193,6 +235,9 @@ class Game:
         self._lose_credits(player, 100)
         return False
 
+    def _random_message(self, category: str) -> str:
+        return self.rng.choice(self.message_pools[category])
+
     def use_item(self, player_index: int, item: Item) -> str:
         if player_index != self.current_player_index:
             raise ValueError("Only the current player can use an item.")
@@ -226,7 +271,7 @@ class Game:
                     message = f"クレジット不足！ 前の支払日へ戻る。必要額: {amount}"
                     return message, message
                 player.credits -= amount
-                payment_message = f"支払日を通過！ -{amount} Credits"
+                payment_message = self._random_message("payment").format(amount=amount)
                 if position == 55:
                     player.final_payment_paid = True
         return None, payment_message
@@ -234,30 +279,30 @@ class Game:
     def _resolve_space(self, player: Player, space_type: SpaceType) -> str:
         if space_type is SpaceType.GAIN:
             player.credits += 100
-            return "コスト最適化に成功！ +100 Credits"
+            return self._random_message("gain").format(amount=100)
         if space_type is SpaceType.LOSS:
             if Item.AWS_BACKUP in player.items:
                 player.items.remove(Item.AWS_BACKUP)
                 return "AWS Backup が損失を防いだ！"
             self._lose_credits(player, 40)
-            return "OpenSearch にお金を溶かした。-40 Credits"
+            return self._random_message("loss").format(amount=40)
         if space_type is SpaceType.ITEM:
             if len(player.items) < 3:
                 item = self.rng.choice(list(Item))
                 player.items.append(item)
-                return f"{item.value} を手に入れた！"
+                return self._random_message("item").format(item=item.value)
             return "アイテム枠がいっぱいだ。"
         if space_type is SpaceType.SUMMIT:
             event = self.rng.choice(("credits", "item", "ddos"))
             if event == "credits":
                 player.credits += 100
-                return "AWS Summit で学びを得た！ +100 Credits"
+                return self._random_message("summit_gain").format(amount=100)
             if event == "item" and len(player.items) < 3:
                 item = self.rng.choice(list(Item))
                 player.items.append(item)
-                return f"AWS Summit で {item.value} を獲得！"
+                return self._random_message("summit_item").format(item=item.value)
             protected = self.apply_ddos(self.current_player_index)
-            return "WAF が DDoS を防いだ！" if protected else "DDoS 攻撃が直撃！ -100 Credits"
+            return self._random_message("ddos_defense") if protected else self._random_message("ddos").format(amount=100)
         return "安全なマス。"
 
     def _next_question(self, is_exam: bool) -> Question:

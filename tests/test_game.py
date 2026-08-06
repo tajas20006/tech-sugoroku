@@ -52,7 +52,8 @@ def test_payment_passage_is_reported_even_when_landing_on_another_space() -> Non
     result = game.take_turn(2)
 
     assert game.players[0].position == 16
-    assert result.payment_message == "支払日を通過！ -100 Credits"
+    assert result.payment_message is not None
+    assert "100 Credits" in result.payment_message
 
 
 def test_payment_returns_to_previous_checkpoint_when_unaffordable() -> None:
@@ -116,6 +117,15 @@ def test_item_spaces_are_available_more_often() -> None:
 
     assert game.space_at(2) is SpaceType.ITEM
     assert game.space_at(56) is SpaceType.ITEM
+
+
+def test_event_messages_are_selected_from_a_random_pool() -> None:
+    game = make_game()
+    game.message_pools["gain"] = ["message A", "message B"]
+
+    messages = {game._random_message("gain") for _ in range(12)}
+
+    assert messages == {"message A", "message B"}
 
 
 def test_player_wins_only_after_final_payment() -> None:
