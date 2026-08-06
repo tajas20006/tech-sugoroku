@@ -13,7 +13,8 @@
 - モードは auto。ユーザー指定に基づき、以後の実装判断は仕様に沿って自律的に進める。
 - MVPは外部データ読み込みを後回しにし、UI動作を優先する。
 - RED: `ModuleNotFoundError: No module named 'game'` を確認。
-- GREEN: `uv run pytest -q` で8件のテストが通過。
+- GREEN: `uv run pytest -q` で9件のテストが通過。
 - 静的検査: `uv run ruff check .` が成功。
 - 起動確認: Flet Webサーバーが `http://127.0.0.1:8550` でHTTP 200を返した。
 - コミット: `feat: add playable AWS sugoroku MVP`（ローカルコミット済み）
+- Flet 0.86.5 の非推奨API修正: `ft.app` を `ft.run`、`ElevatedButton` を `Button`、旧 alignment 定数を `ft.Alignment.CENTER` に置換。

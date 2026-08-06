@@ -64,7 +64,7 @@ def main(page: ft.Page) -> None:
     board = ft.GridView(runs_count=10, max_extent=72, spacing=5, run_spacing=5, expand=True)
     player_cards = ft.Column(spacing=8)
     question_area = ft.Column(spacing=10)
-    roll_button = ft.ElevatedButton("🎲 サイコロを振る", width=220)
+    roll_button = ft.Button("🎲 サイコロを振る", width=220)
 
     def token_for(position: int) -> str:
         tokens: list[str] = []
@@ -93,7 +93,7 @@ def main(page: ft.Page) -> None:
                     bgcolor=color,
                     border_radius=10,
                     padding=4,
-                    alignment=ft.alignment.center,
+                    alignment=ft.Alignment.CENTER,
                 )
             )
 
@@ -129,7 +129,7 @@ def main(page: ft.Page) -> None:
         question_area.controls.append(ft.Text(question.prompt, size=16))
         for index, choice in enumerate(question.choices):
             question_area.controls.append(
-                ft.OutlinedButton(choice, on_click=lambda event, answer=index: answer_question(answer), width=320)
+                ft.Button(choice, on_click=lambda event, answer=index: answer_question(answer), width=320)
             )
         roll_button.disabled = True
 
@@ -178,4 +178,4 @@ def main(page: ft.Page) -> None:
 
 
 if __name__ == "__main__":
-    ft.app(target=main, assets_dir="assets")
+    ft.run(main, assets_dir="assets")
